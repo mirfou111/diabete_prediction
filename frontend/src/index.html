@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>IA Diabète - Système Expert</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState } = React;
+        
+        // Détection dynamique de l'IP du serveur pour l'API
+        const API_BASE_URL = window.API_URL || (window.location.hostname === 'localhost' ? 'http://192.168.56.1:5000' : window.location.origin + '/api');	
+
+        function App() {
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [session, setSession] = useState(null);
+            const [view, setView] = useState("diagnostic");
+            const [result, setResult] = useState(null);
+            const [history, setHistory] = useState([]);
+            
+            const [formData, setFormData] = useState({ 
+                patient_id: "", gender: "Male", age: 40, hypertension: 0, 
+                heart_disease: 0, bmi: 24.5, HbA1c_level: 5.5, blood_glucose_level: 100, smoking_history: "never"
+            });
+
+            const [newUser, setNewUser] = useState({ username: "", password: "", role: "expert" });
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                try {
+                    const res = await fetch(`${API_BASE_URL}/login` , {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({username: e.target[0].value, password: e.target[1].value})
+                    });
+                    if (res.ok) { 
+                        setSession(await res.json()); 
+                        setIsLoggedIn(true); 
+                    } else {
+                        alert("Identifiants incorrects");
+                    }
+                } catch (err) {
+                    alert("Erreur de connexion à l'API : " + err.message);
+                }
+            };
+
+            const handlePredict = async (e) => {
+                e.preventDefault();
+                const res = await fetch(`${API_BASE_URL}/predict` , {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                setResult(await res.json());
+            };
+
+            if (!isLoggedIn) return (
+                <div className="container mt-5 pt-5">
+                    <div className="card mx-auto p-4 shadow" style={{maxWidth: "400px"}}>
+                        <h3 className="text-center mb-4">🔐 Authentification</h3>
+                        <form onSubmit={handleLogin}>
+                            <input type="text" className="form-control mb-3" placeholder="Identifiant" required />
+                            <input type="password" className="form-control mb-3" placeholder="Mot de passe" required />
+                            <button className="btn btn-primary w-100">Connexion</button>
+                        </form>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="container py-4">
+                    <nav className="navbar navbar-expand-lg navbar-dark bg-dark rounded px-3 mb-4 shadow">
+                        <span className="navbar-brand fw-bold text-info">🏥 IA-DIABÈTE</span>
+                        <div className="navbar-nav me-auto">
+                            <button className="btn btn-link nav-link" onClick={() => setView('diagnostic')}>Diagnostic</button>
+                            <button className="btn btn-link nav-link" onClick={() => setView('history')}>Historique</button>
+                            {session?.role === 'admin' && <button className="btn btn-link nav-link text-warning" onClick={() => setView('admin')}>Gestion Experts</button>}
+                        </div>
+                        <button className="btn btn-outline-danger btn-sm" onClick={() => setIsLoggedIn(false)}>Déconnexion</button>
+                    </nav>
+
+                    {view === "diagnostic" && (
+                        <div className="card p-4 shadow border-0">
+                            <h4 className="mb-4 text-primary"><i className="bi bi-clipboard2-pulse"></i> Examen Biologique</h4>
+                            <form onSubmit={handlePredict} className="row g-3">
+                                <div className="col-md-6">
+                                    <label className="fw-bold">ID Patient</label>
+                                    <input type="text" className="form-control border-primary" required onChange={e => setFormData({...formData, patient_id: e.target.value})} />
+                                </div>
+                                <div className="col-md-3">
+                                    <label>Genre</label>
+                                    <select className="form-select" onChange={e => setFormData({...formData, gender: e.target.value})}>
+                                        <option value="Male">Homme</option>
+                                        <option value="Female">Femme</option>
+                                    </select>
+                                </div>
+                                <div className="col-md-3">
+                                    <label>Âge</label>
+                                    <input type="number" className="form-control" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} />
+                                </div>
+                                <div className="col-md-4">
+                                    <label>IMC (BMI)</label>
+                                    <input type="number" step="0.1" className="form-control" value={formData.bmi} onChange={e => setFormData({...formData, bmi: e.target.value})} />
+                                </div>
+                                <div className="col-md-4">
+                                    <label>HbA1c (%)</label>
+                                    <input type="number" step="0.1" className="form-control" value={formData.HbA1c_level} onChange={e => setFormData({...formData, HbA1c_level: e.target.value})} />
+                                </div>
+                                <div className="col-md-4">
+                                    <label>Glycémie (mg/dL)</label>
+                                    <input type="number" className="form-control" value={formData.blood_glucose_level} onChange={e => setFormData({...formData, blood_glucose_level: e.target.value})} />
+                                </div>
+                                <div className="col-md-12">
+                                    <label>Statut Tabagique</label>
+                                    <select className="form-select" onChange={e => setFormData({...formData, smoking_history: e.target.value})}>
+                                        <option value="never">Jamais fumé</option>
+                                        <option value="current">Fumeur actuel</option>
+                                        <option value="former">Ancien fumeur</option>
+                                        <option value="ever">A déjà fumé</option>
+                                        <option value="No Info">Information non disponible</option>
+                                    </select>
+                                </div>
+                                <div className="col-md-6">
+                                    <div className="form-check form-switch p-2 border rounded">
+                                        <input className="form-check-input ms-1" type="checkbox" onChange={e => setFormData({...formData, hypertension: e.target.checked ? 1 : 0})} />
+                                        <label className="form-check-label ms-2">Hypertension Artérielle</label>
+                                    </div>
+                                </div>
+                                <div className="col-md-6">
+                                    <div className="form-check form-switch p-2 border rounded">
+                                        <input className="form-check-input ms-1" type="checkbox" onChange={e => setFormData({...formData, heart_disease: e.target.checked ? 1 : 0})} />
+                                        <label className="form-check-label ms-2">Maladie Cardiaque</label>
+                                    </div>
+                                </div>
+                                <button className="btn btn-success mt-4 fw-bold shadow-sm">OBTENIR LE VERDICT IA</button>
+                            </form>
+                            {result && (
+                                <div className={`alert mt-4 shadow-sm ${result.prediction === 1 ? 'alert-danger border-danger' : 'alert-success border-success'}`}>
+                                    <h5>{result.prediction === 1 ? '🚨 RISQUE DE DIABÈTE DÉTECTÉ' : '✅ PROFIL À FAIBLE RISQUE'}</h5>
+                                    <hr/>
+                                    <strong>Probabilité calculée :</strong> {(result.probability * 100).toFixed(2)}%
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {view === "history" && (
+                        <div className="card p-4 shadow border-0">
+                            <h4><i className="bi bi-clock-history"></i> Historique Patient</h4>
+                            <div className="input-group my-3 shadow-sm">
+                                <input type="text" id="searchId" className="form-control" placeholder="Entrez l'ID Patient pour recherche" />
+                                <button className="btn btn-primary px-4" onClick={async () => {
+                                    const res = await fetch(`${API_BASE_URL}/history/${document.getElementById('searchId').value}`);
+                                    setHistory(await res.json());
+                                }}>Rechercher</button>
+                            </div>
+                            <table className="table table-hover mt-3">
+                                <thead className="table-dark text-center">
+                                    <tr><th>Date</th><th>Glycémie</th><th>HbA1c</th><th>IMC</th><th>Verdict</th></tr>
+                                </thead>
+                                <tbody className="text-center">
+                                    {history.map((h, i) => (
+                                        <tr key={i}>
+                                            <td>{new Date(h.date).toLocaleDateString()}</td>
+                                            <td><span className="badge bg-info text-dark">{h.glucose}</span></td>
+                                            <td>{h.hba1c}%</td>
+                                            <td>{h.imc}</td>
+                                            <td><span className={`badge ${h.result === 1 ? 'bg-danger' : 'bg-success'}`}>{h.result === 1 ? 'POSITIF' : 'NÉGATIF'}</span></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {view === "admin" && (
+                        <div className="card p-4 shadow border-0">
+                            <h4 className="text-warning mb-3">🛠️ Administration des comptes experts</h4>
+                            <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                try {
+                                    const res = await fetch(`${API_BASE_URL}/add_user`, { // <-- Correction ici
+                                        method: 'POST', 
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(newUser)
+                                    });
+                                    if (res.ok) { 
+                                        alert("Compte créé avec succès !"); 
+                                        setView("diagnostic"); 
+                                    }
+                                } catch (err) {
+                                    alert("Erreur réseau");
+                                }
+                            }}>
+                                <input type="text" className="form-control mb-3" placeholder="Identifiant du nouvel expert" required onChange={e => setNewUser({...newUser, username: e.target.value})} />
+                                <input type="password" className="form-control mb-3" placeholder="Mot de passe provisoire" required onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                                <select className="form-select mb-3" onChange={e => setNewUser({...newUser, role: e.target.value})}>
+                                    <option value="expert">Expert</option>
+                                    <option value="admin">Administrateur</option>
+                                </select>
+                                <button className="btn btn-warning w-100 fw-bold">CRÉER LE COMPTE</button>
+                            </form>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
