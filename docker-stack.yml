@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  visualizer:
+    image: dockersamples/visualizer:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Suppression du montage SQL relatif pour Swarm
+    volumes:
+      - pgdata_swarm:/var/lib/postgresql/data
+    networks:
+      - back-net
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  redis:
+    image: redis:alpine
+    networks:
+      - back-net
+    deploy:
+      replicas: 1
+
+  web:
+    image: mirfou1/diabete_api:v0.0.1
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_HOST: redis
+    networks:
+      - back-net
+      - front-net
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+
+  ui:
+    image: mirfou1/diabete_ui:v0.0.1
+    ports:
+      - "80:80"
+    networks:
+      - front-net
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 2
+        delay: 5s
+
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8081:8080"
+    networks:
+      - back-net
+    deploy:
+      replicas: 1
+
+networks:
+  front-net:
+    driver: overlay
+  back-net:
+    driver: overlay
+    internal: true
+
+volumes:
+  pgdata_swarm:
