@@ -77,7 +77,7 @@ networks:
     driver: overlay
   back-net:
     driver: overlay
-    internal: true
+   # internal: true
 
 volumes:
   pgdata_swarm:
