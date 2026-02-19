@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: diabetes-config
+data:
+  POSTGRES_USER: "admin"
+  POSTGRES_DB: "diabetes_db"
+  # db-service correspond au nom du service défini dans le fichier 04
+  DATABASE_URL: "postgresql+psycopg2://admin:admin@db-service:5432/diabetes_db"

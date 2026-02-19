@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Secrets & Config
+.env
+*.env
+
+# Docker & OS
+.DS_Store
+*.log
+pgdata/
+pgdata_swarm/
+
+# Modèles (souvent trop gros pour Git)
+*.pkl
