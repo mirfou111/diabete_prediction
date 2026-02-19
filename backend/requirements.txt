@@ -1,0 +1,9 @@
+flask
+flask-cors
+psycopg2-binary
+pandas
+scikit-learn==1.6.1
+sqlalchemy
+joblib
+pyjwt
+werkzeug
