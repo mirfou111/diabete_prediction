@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # --- BASE DE DONNÉES ---
+  db:
+    image: postgres:15-alpine
+    container_name: diabetes_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Le script SQL reste en backup, mais le app.py gérera l'init
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - back-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # --- CACHE (Requis par le sujet) ---
+  redis:
+    image: redis:alpine
+    container_name: diabetes_cache
+    networks:
+      - back-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # --- API BACKEND (ML) ---
+  web:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    image: mirfou1/diabete_api:v0.0.1
+    container_name: diabetes_api
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_HOST: redis
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - front-net
+      - back-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  # --- INTERFACE UTILISATEUR ---
+  ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: mirfou1/diabete_ui:v0.0.1
+    container_name: diabetes_ui
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+    networks:
+      - front-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # --- ADMINISTRATION DB (Optionnel pour la démo) ---
+  adminer:
+    image: adminer:latest
+    container_name: diabetes_adminer
+    ports:
+      - "8081:8080"
+    networks:
+      - front-net
+      - back-net
+    depends_on:
+      db:
+        condition: service_healthy
+
+# --- RÉSEAUX ---
+networks:
+  front-net:
+    driver: bridge
+  back-net:
+    driver: bridge
+    #internal: true # Sécurité : Isole la DB et Redis de l'extérieur
+
+# --- VOLUMES ---
+volumes:
+  pgdata:
