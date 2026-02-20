@@ -14,15 +14,28 @@ spec:
     spec:
       containers:
       - name: web-container
-        image: mirfou1/diabete_api:v0.0.1
+        image: mirfou1/diabete_api:v0.0.4
         ports:
         - containerPort: 5000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          failureThreshold: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
         resources:
           requests:
             memory: "64Mi"
             cpu: "100m"
           limits:
-            memory: "128Mi"
+            memory: "512Mi"
             cpu: "500m"
         envFrom:
         - configMapRef:

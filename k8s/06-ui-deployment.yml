@@ -28,22 +28,16 @@ spec:
         - name: index-html-volume
           mountPath: /usr/share/nginx/html/index.html
           subPath: index.html
-<<<<<<< HEAD
         - name: nginx-config-volume
           mountPath: /etc/nginx/conf.d/default.conf
           subPath: default.conf
-=======
->>>>>>> ed8b448757a4a6885b3b29e56a93b35de9b76564
       volumes:
       - name: index-html-volume
         configMap:
           name: ui-index-html
-<<<<<<< HEAD
       - name: nginx-config-volume
         configMap:
           name: ui-nginx-config
-=======
->>>>>>> ed8b448757a4a6885b3b29e56a93b35de9b76564
 ---
 apiVersion: v1
 kind: Service

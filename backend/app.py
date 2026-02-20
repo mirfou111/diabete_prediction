@@ -1,5 +1,6 @@
 import os
 import joblib
+import time
 import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -14,51 +15,41 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 engine = create_engine(DATABASE_URL)
 
 def init_db():
-    """Initialise la base de données et crée Dr_Moussa si inexistant."""
-    print("Initialisation de la base de données...")
-    try:
-        with engine.connect() as conn:
-            # 1. Création des tables si elles n'existent pas
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS users (
+    for attempt in range(15):  # 15 tentatives x 5s = 75s max
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("""CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     username VARCHAR(50) UNIQUE NOT NULL,
                     password VARCHAR(255) NOT NULL,
                     role VARCHAR(20) DEFAULT 'expert'
-                );
-            """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS diagnostics (
+                );"""))
+                conn.execute(text("""CREATE TABLE IF NOT EXISTS diagnostics (
                     id SERIAL PRIMARY KEY,
                     patient_id VARCHAR(50) NOT NULL,
-                    patient_age FLOAT,
-                    bmi FLOAT,
-                    hba1c_level FLOAT,
-                    blood_glucose_level FLOAT,
-                    prediction INTEGER,
-                    probability FLOAT,
+                    patient_age FLOAT, bmi FLOAT,
+                    hba1c_level FLOAT, blood_glucose_level FLOAT,
+                    prediction INTEGER, probability FLOAT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """))
-            conn.commit()
-
-            # 2. Vérification et création de Dr_Moussa
-            check_user = conn.execute(text("SELECT id FROM users WHERE username = :u"), {"u": "Dr_Moussa"}).fetchone()
-            
-            if not check_user:
-                print("Création du compte Dr_Moussa...")
-                hashed_pw = generate_password_hash('master2_pass')
-                conn.execute(
-                    text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
-                    {"u": "Dr_Moussa", "p": hashed_pw, "r": "admin"}
-                )
+                );"""))
                 conn.commit()
-                print("Dr_Moussa a été créé avec succès.")
-            else:
-                print("Dr_Moussa existe déjà dans la base.")
-                
-    except Exception as e:
-        print(f"Erreur lors de l'initialisation : {e}")
+                check_user = conn.execute(text("SELECT id FROM users WHERE username = :u"), {"u": "Dr_Moussa"}).fetchone()
+                if not check_user:
+                    hashed_pw = generate_password_hash('master2_pass')
+                    conn.execute(
+                        text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
+                        {"u": "Dr_Moussa", "p": hashed_pw, "r": "admin"}
+                    )
+                    conn.commit()
+            print("✅ DB initialisée avec succès")
+            return
+        except Exception as e:
+            print(f"⏳ Tentative {attempt+1}/15 échouée : {e}")
+            time.sleep(5)
+    raise RuntimeError("❌ Impossible de connecter à la DB après 75 secondes")
+
+# Appel au niveau module — bloque Flask jusqu'à succès
+init_db()
 
 # Chargement du modèle
 try:
@@ -152,5 +143,4 @@ def add_user():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    init_db()  # Lancement auto de l'initialisation
     app.run(host='0.0.0.0', port=5000)
