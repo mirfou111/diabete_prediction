@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: ui-container
-        image: mirfou1/diabete_ui:v1.0.0
+        image: mirfou1/diabete_ui:v0.0.1
         ports:
         - containerPort: 80
         resources:
@@ -28,10 +28,16 @@ spec:
         - name: index-html-volume
           mountPath: /usr/share/nginx/html/index.html
           subPath: index.html
+        - name: nginx-config-volume
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
       volumes:
       - name: index-html-volume
         configMap:
           name: ui-index-html
+      - name: nginx-config-volume
+        configMap:
+          name: ui-nginx-config
 ---
 apiVersion: v1
 kind: Service
