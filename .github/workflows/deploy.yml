@@ -1,0 +1,106 @@
+name: CI/CD Pipeline - Diabetes App
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
+jobs:
+  # ============================================================
+  # JOB 1 : Build et Push des images Docker
+  # ============================================================
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v3
+
+      - name: Login sur Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extraire le tag (SHA court)
+        id: vars
+        run: echo "TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Build et Push image Backend (API)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/diabete_api:${{ steps.vars.outputs.TAG }}
+            ${{ secrets.DOCKER_USERNAME }}/diabete_api:latest
+
+      - name: Build et Push image Frontend (UI)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/diabete_ui:${{ steps.vars.outputs.TAG }}
+            ${{ secrets.DOCKER_USERNAME }}/diabete_ui:latest
+
+  # ============================================================
+  # JOB 2 : Déploiement sur Kubernetes
+  # ============================================================
+  deploy:
+    name: Deploy sur Kubernetes
+    runs-on: self-hosted
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v3
+
+      - name: Extraire le tag (SHA court)
+        id: vars
+        run: echo "TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Configurer kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Mettre à jour l'image Backend dans le deployment
+        run: |
+          kubectl set image deployment/diabetes-web \
+            web-container=${{ secrets.DOCKER_USERNAME }}/diabete_api:${{ steps.vars.outputs.TAG }} \
+            --record
+
+      - name: Mettre à jour l'image Frontend dans le deployment
+        run: |
+          kubectl set image deployment/diabetes-ui \
+            ui-container=${{ secrets.DOCKER_USERNAME }}/diabete_ui:${{ steps.vars.outputs.TAG }} \
+            --record
+
+      - name: Appliquer les manifestes Kubernetes
+        run: |
+          kubectl apply -f k8s/02-configmap.yml
+          kubectl apply -f k8s/03-pvc.yml
+          kubectl apply -f k8s/04-db-deployment.yml
+          kubectl apply -f k8s/05-web-deployment.yml
+          kubectl apply -f k8s/06-ui-deployment.yml
+          kubectl apply -f k8s/07-ingress.yml
+          kubectl apply -f k8s/08-hpa.yml
+
+      - name: Vérifier le déploiement Backend
+        run: |
+          kubectl rollout status deployment/diabetes-web --timeout=120s
+
+      - name: Vérifier le déploiement Frontend
+        run: |
+          kubectl rollout status deployment/diabetes-ui --timeout=120s
+
+      - name: Afficher l'état final des pods
+        run: kubectl get pods -o wide
