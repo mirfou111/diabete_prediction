@@ -69,7 +69,7 @@ jobs:
       - name: Configurer kubectl
         run: |
           mkdir -p ~/.kube
-          cp /home/mirfou/.kube/config ~/.kube/config
+         # cp /home/mirfou/.kube/config ~/.kube/config
           chmod 600 ~/.kube/config
 
       - name: Appliquer les manifestes Kubernetes
