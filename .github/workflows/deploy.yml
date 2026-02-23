@@ -96,10 +96,10 @@ jobs:
             ui-container=${{ secrets.DOCKER_USERNAME }}/diabete_ui:${{ steps.vars.outputs.TAG }}
 
       - name: Vérifier le déploiement Backend
-        run: kubectl rollout status deployment/diabetes-web --timeout=120s
+        run: kubectl rollout status deployment/diabetes-web --timeout=300s
 
       - name: Vérifier le déploiement Frontend
-        run: kubectl rollout status deployment/diabetes-ui --timeout=120s
+        run: kubectl rollout status deployment/diabetes-ui --timeout=300s
 
       - name: Afficher l'état final des pods
         run: kubectl get pods -o wide
