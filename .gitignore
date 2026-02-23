@@ -15,6 +15,3 @@ ENV/
 *.log
 pgdata/
 pgdata_swarm/
-
-# Modèles (souvent trop gros pour Git)
-*.pkl
